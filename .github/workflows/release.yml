@@ -1,0 +1,43 @@
+name: Release Build
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-upload:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Package artifact (linux/macos)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist
+          tar -C target/release -czf "dist/mcp-fs-${{ runner.os }}.tar.gz" mcp-fs
+
+      - name: Package artifact (windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir dist
+          powershell -Command "Compress-Archive -Path target\\release\\mcp-fs.exe -DestinationPath dist\\mcp-fs-${{ runner.os }}.zip"
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
