@@ -34,9 +34,11 @@ jobs:
 
       - name: Package artifact (windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          mkdir dist
-          powershell -Command "$os = \"${{ runner.os }}\".ToLower(); Compress-Archive -Path target\\release\\mcp-fs.exe -DestinationPath (\"dist\\mcp-fs-$os.zip\")"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $os = "${{ runner.os }}".ToLower()
+          Compress-Archive -Path target\release\mcp-fs.exe -DestinationPath "dist\mcp-fs-$os.zip"
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
