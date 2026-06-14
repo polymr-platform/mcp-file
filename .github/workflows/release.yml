@@ -29,13 +29,14 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           mkdir -p dist
-          tar -C target/release -czf "dist/mcp-fs-${{ runner.os }}.tar.gz" mcp-fs
+          os_name=$(printf '%s' "${{ runner.os }}" | tr '[:upper:]' '[:lower:]')
+          tar -C target/release -czf "dist/mcp-fs-${os_name}.tar.gz" mcp-fs
 
       - name: Package artifact (windows)
         if: runner.os == 'Windows'
         run: |
           mkdir dist
-          powershell -Command "Compress-Archive -Path target\\release\\mcp-fs.exe -DestinationPath dist\\mcp-fs-${{ runner.os }}.zip"
+          powershell -Command "$os = \"${{ runner.os }}\".ToLower(); Compress-Archive -Path target\\release\\mcp-fs.exe -DestinationPath (\"dist\\mcp-fs-$os.zip\")"
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
