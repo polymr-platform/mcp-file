@@ -1,0 +1,32 @@
+[package]
+name = "mcp-fs"
+version = "0.1.0"
+edition = "2021"
+license = "LGPL-3.0-or-later"
+
+[dependencies]
+anyhow = "1.0"
+base64 = "0.22"
+globset = "0.4"
+grep-regex = "0.1"
+grep-searcher = "0.1"
+ignore = "0.4"
+opentelemetry = "0.24"
+opentelemetry-otlp = { version = "0.17", features = ["tonic"] }
+opentelemetry-semantic-conventions = "0.16"
+opentelemetry_sdk = { version = "0.24", features = ["rt-tokio"] }
+regex = "1.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+similar = "2.7"
+thiserror = "1.0"
+tokio = { version = "1.40", features = ["macros", "rt-multi-thread", "io-util", "io-std", "process", "fs"] }
+tracing = "0.1"
+tracing-opentelemetry = "0.25"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1.11", features = ["v4"] }
+filetime = "0.2"
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3.10"

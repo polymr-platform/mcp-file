@@ -1,0 +1,1893 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8"/>
+		<title>diff</title>
+		<style>
+			body {
+				--diff-accent-bg: var(--color-background-info, #1f2a3a);
+				--diff-accent-fg: var(--color-text-warning, #9cc3ff);
+				--diff-code-comment: var(--color-text-secondary, #9aa092);
+				--diff-code-punctuation: var(--color-text-primary, #e5e5dd);
+				--diff-code-constant: #f2a45d;
+				--diff-code-tag: #6fd6c2;
+				--diff-code-number: #f0c169;
+				--diff-code-string: #87d97a;
+				--diff-code-operator: var(--color-text-primary, #d4d8df);
+				--diff-code-keyword: #b6a6ff;
+				--diff-code-entity: #72c2ff;
+				--diff-code-variable: #f2a2e8;
+				--diff-code-attr-name: #7dd3e8;
+				--diff-code-attr-value: #ffd28a;
+			}
+
+			body {
+				font-family: var(--font-sans, Arial, sans-serif);
+				margin: 0;
+				padding: 0.875rem 1rem;
+				background: var(--color-background-primary, #fdfdfb);
+				color: var(--color-text-primary, #1f1f1b);
+			}
+
+			body[data-view='unified'] .diff-head-split, body[data-view='unified'] .diff-body-split {
+				display: none;
+			}
+
+			body[data-view='split'] .diff-head-unified, body[data-view='split'] .diff-body-unified {
+				display: none;
+			}
+
+			.mcp-toolbar {
+				display: inline-flex;
+				align-items: center;
+				border: 1px solid color-mix(in srgb, var(--color-border-primary, #d8d7d1) 50%, var(--color-background-primary, #fdfdfb) 50%);
+				border-radius: var(--border-radius-md, 0.5rem);
+				overflow: hidden;
+				margin-left: auto;
+				background: var(--color-background-secondary, #f0f0ec);
+			}
+
+			.mcp-button {
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				padding: 0.25rem 0.625rem;
+				border: 0;
+				background: transparent;
+				color: var(--color-text-secondary, #4b4a44);
+				font-size: 0.75rem;
+				line-height: 1.4;
+				cursor: pointer;
+			}
+
+			.mcp-button + .mcp-button {
+				border-left: 1px solid color-mix(in srgb, var(--color-border-primary, #d8d7d1) 50%, var(--color-background-primary, #fdfdfb) 50%);
+			}
+
+			.mcp-button.active {
+				background: var(--diff-accent-bg);
+				color: var(--diff-accent-fg);
+			}
+
+			table.diff {
+				width: 100%;
+				border-collapse: separate;
+				border-spacing: 0;
+				table-layout: auto;
+			}
+
+			table.diff th, table.diff td {
+				vertical-align: top;
+			}
+
+			table.diff thead th {
+				font-weight: 600;
+				color: var(--color-text-primary, #1f1f1b);
+				padding: 0.5rem;
+			}
+
+			.diff-head-toolbar {
+				text-align: right;
+				width: 1%;
+				white-space: nowrap;
+				position: absolute;
+				left: calc(100% - 135px);
+			}
+
+			.diff-head-unified th.ln, .diff-layout-unified td.ln {
+				width: 56px;
+			}
+
+			.diff-head-split th.ln, .diff-layout-split td.ln {
+				width: 56px;
+			}
+
+			td.ln {
+				width: 56px;
+				text-align: right;
+				color: var(--color-text-secondary, #4b4a44);
+				padding: 0.125rem 0.5rem;
+				background: var(--color-background-primary, #fdfdfb);
+				border-right: 1px solid color-mix(in srgb, var(--color-border-primary, #d8d7d1) 40%, var(--color-background-primary, #fdfdfb) 60%);
+				user-select: none;
+				-webkit-user-select: none;
+				font-size: 0.75rem;
+			}
+
+			td.code {
+				width: auto;
+				padding: 0.125rem 0.5rem;
+				background: var(--color-background-primary, #fdfdfb);
+			}
+
+			.code-block {
+				background: transparent;
+			}
+
+			.code-block code {
+				display: block;
+				background: transparent;
+				color: inherit;
+			}
+
+			table.diff.diff-layout-split td.code {
+				width: calc(50% - 56px);
+				max-width: calc(50vw - 80px);
+				padding: 0.125rem 0.5rem;
+			}
+
+			table.diff.diff-layout-split td.ln {
+				padding: 0;
+				font-size: 0.8125rem;
+			}
+
+			table.diff.diff-layout-unified td.ln {
+				padding: 0.125rem 0.5rem;
+			}
+
+			table.diff.diff-layout-unified td.code {
+				padding: 0.125rem 0.5rem;
+			}
+
+			.status-shell {
+				display: none;
+				padding: 1rem;
+				margin: 0.5rem 0 0;
+				border: 1px solid color-mix(in srgb, var(--color-border-primary, #d8d7d1) 55%, var(--color-background-primary, #fdfdfb) 45%);
+				border-radius: var(--border-radius-md, 0.5rem);
+				font-size: 0.875rem;
+				line-height: 1.5;
+			}
+
+			.status-shell strong {
+				display: block;
+				margin-bottom: 0.25rem;
+				font-size: 0.875rem;
+			}
+
+			.status-shell p {
+				margin: 0;
+			}
+
+			.loading-shell {
+				color: var(--color-text-secondary, #4b4a44);
+				background: color-mix(in srgb, var(--color-background-secondary, #f0f0ec) 65%, var(--color-background-primary, #fdfdfb) 35%);
+			}
+
+			.error-shell {
+				color: var(--color-text-danger, #b3343a);
+				background: color-mix(in srgb, var(--color-background-danger, #b3343a) 18%, var(--color-background-primary, #fdfdfb) 82%);
+				border-color: color-mix(in srgb, var(--color-background-danger, #b3343a) 45%, var(--color-border-primary, #d8d7d1) 55%);
+			}
+
+			.warning-shell {
+				color: var(--color-text-warning, #7a5c1f);
+				background: color-mix(in srgb, var(--color-background-warning, #7a5c1f) 18%, var(--color-background-primary, #fdfdfb) 82%);
+				border-color: color-mix(in srgb, var(--color-background-warning, #7a5c1f) 45%, var(--color-border-primary, #d8d7d1) 55%);
+			}
+
+			body[data-state='loading'] .loading-shell,
+					body[data-state='error'] .error-shell,
+					body[data-state='warning'] .warning-shell {
+				display: block;
+			}
+
+			body[data-state='loading'] #diff-table,
+					body[data-state='error'] #diff-table,
+					body[data-state='warning'] #diff-table {
+				display: none;
+			}
+
+			table.diff.diff-layout-split pre {
+				line-height: 1.25;
+			}
+
+			tr.del td.ln, tr.del td.code {
+				background: color-mix(in srgb, var(--color-background-danger, #b3343a) 75%, var(--color-background-primary, #fdfdfb));
+			}
+
+			tr.ins td.ln, tr.ins td.code {
+				background: color-mix(in srgb, var(--color-background-success, #2f7f6b) 75%, var(--color-background-primary, #fdfdfb));
+			}
+
+			tr.eq td.ln, tr.eq td.code {
+				background: var(--color-background-primary, #fdfdfb);
+			}
+
+			tr.ctx-row {
+				display: none;
+			}
+
+			tr.ctx-row.ctx-open {
+				display: table-row;
+			}
+
+			tr.ctx-row:not(.ctx-open) {
+				display: none;
+			}
+
+			tr.ctx-toggle td {
+				padding: 0.125rem 0;
+				background: var(--color-background-primary, #fdfdfb);
+				border-top: 1px solid color-mix(in srgb, var(--color-border-primary, #d8d7d1) 40%, var(--color-background-primary, #fdfdfb) 60%);
+				border-bottom: 1px solid color-mix(in srgb, var(--color-border-primary, #d8d7d1) 40%, var(--color-background-primary, #fdfdfb) 60%);
+			}
+
+			tr.diff-warning td {
+				padding: 0.375rem 0.5rem;
+				background: color-mix(in srgb, var(--color-background-warning, #7a5c1f) 35%, var(--color-background-primary, #fdfdfb));
+				color: var(--color-text-primary, #1f1f1b);
+				font-size: 0.75rem;
+			}
+
+			.ctx-cell {
+				text-align: center;
+			}
+
+			.ctx-btn {
+				font: inherit;
+				font-size: 0.75rem;
+				color: var(--diff-accent-fg);
+				background: transparent;
+				border: 0;
+				padding: 0 0.5rem;
+				cursor: pointer;
+				border: 1px solid var(--color-border-primary, #d8d7d1);
+				vertical-align: center;
+			}
+
+			pre {
+				margin: 0;
+				white-space: pre-wrap;
+				font-family: var(--font-mono, ui-monospace, monospace);
+				font-size: 0.8125rem;
+				line-height: 1.45;
+			}
+
+			table.diff.diff-layout-unified td.ln pre {
+				font-family: var(--font-mono, ui-monospace, monospace);
+				font-size: 0.75rem;
+				line-height: 1.45;
+			}
+
+			table.diff.diff-layout-unified td.code {
+				width: auto;
+			}
+
+			.token.comment, .token.prolog, .token.doctype, .token.cdata {
+				color: var(--diff-code-comment);
+			}
+
+			.token.punctuation {
+				color: var(--diff-code-punctuation);
+			}
+
+			.token.property, .token.constant, .token.symbol, .token.deleted {
+				color: var(--diff-code-constant);
+			}
+
+			.token.tag {
+				color: var(--diff-code-tag);
+			}
+
+			.token.boolean, .token.number {
+				color: var(--diff-code-number);
+			}
+
+			.token.selector, .token.string, .token.char, .token.builtin, .token.inserted {
+				color: var(--diff-code-string);
+			}
+
+			.token.attr-name {
+				color: var(--diff-code-attr-name);
+			}
+
+			.token.operator, .token.entity, .token.url, .language-css .token.string, .style .token.string {
+				color: var(--diff-code-operator);
+			}
+
+			.token.atrule, .token.keyword {
+				color: var(--diff-code-keyword);
+				font-weight: 600;
+			}
+
+			.token.attr-value {
+				color: var(--diff-code-attr-value);
+				font-weight: 400;
+			}
+
+			.token.function {
+				color: var(--diff-code-entity);
+				font-weight: 400;
+			}
+
+			.token.class-name {
+				color: var(--diff-code-entity);
+				font-weight: 600;
+			}
+
+			.token.regex, .token.important, .token.variable {
+				color: var(--diff-code-variable);
+			}
+
+			.token.variable {
+				font-weight: 400;
+			}
+		</style>
+	</head>
+	<body data-view="unified" data-state="idle">
+		<div class="status-shell loading-shell" id="loading-shell">
+			<strong>Loading review</strong>
+			<p>Waiting for the tool result.</p>
+		</div>
+		<div class="status-shell error-shell" id="error-shell">
+			<strong>Could not render review</strong>
+			<p id="error-message">The tool returned an error.</p>
+		</div>
+		<div class="status-shell warning-shell" id="warning-shell">
+			<strong>No diff available</strong>
+			<p id="warning-message">There are no changes to display.</p>
+		</div>
+		<table class="diff diff-layout-unified" id="diff-table">
+			<thead class="diff-head-unified">
+				<tr>
+					<th class="ln">Original</th>
+					<th class="ln">Updated</th>
+					<th>Unified</th>
+					<th class="diff-head-toolbar">
+						<div class="mcp-toolbar">
+							<button class="toggle mcp-button" data-view="unified">Unified</button>
+							<button class="toggle mcp-button" data-view="split">Split</button>
+						</div>
+					</th>
+				</tr>
+			</thead>
+			<thead class="diff-head-split">
+				<tr>
+					<th colspan="2">Original</th>
+					<th colspan="2">Updated</th>
+					<th class="diff-head-toolbar">
+						<div class="mcp-toolbar">
+							<button class="toggle mcp-button" data-view="unified">Unified</button>
+							<button class="toggle mcp-button" data-view="split">Split</button>
+						</div>
+					</th>
+				</tr>
+			</thead>
+			<tbody class="diff-body-unified" id="unified-body"></tbody>
+			<tbody class="diff-body-split" id="split-body"></tbody>
+		</table>
+		<script>
+			(function () {
+				var CONTEXT_RADIUS = 3;
+				function escapeHtml(value) {
+					return String(value)
+						.replace(/&/g, "&amp;")
+						.replace(/</g, "&lt;")
+						.replace(/>/g, "&gt;")
+						.replace(/\"/g, "&quot;")
+						.replace(/'/g, "&#39;");
+				}
+				function pathBasename(path) {
+					var parts = String(path || "").split(/[\\/]/);
+					return parts[parts.length - 1] || "";
+				}
+				function prismLanguage(path) {
+					var name = pathBasename(path).toLowerCase();
+					var ext = name.includes(".") ? name.split(".").pop() : "";
+					var map = {
+						js: "javascript",
+						mjs: "javascript",
+						cjs: "javascript",
+						ts: "typescript",
+						tsx: "tsx",
+						jsx: "jsx",
+						rs: "rust",
+						py: "python",
+						java: "java",
+						kt: "kotlin",
+						go: "go",
+						rb: "ruby",
+						php: "php",
+						cs: "csharp",
+						cpp: "cpp",
+						cc: "cpp",
+						cxx: "cpp",
+						c: "c",
+						h: "c",
+						htm: "html",
+						html: "html",
+						xml: "xml",
+						svg: "svg",
+						md: "markdown",
+						json: "json",
+						yml: "yaml",
+						yaml: "yaml",
+						css: "css",
+						scss: "scss",
+						sh: "bash",
+						bash: "bash",
+						zsh: "bash",
+						sql: "sql",
+						toml: "toml",
+						vue: "vue"
+					};
+					return map[ext] || "plain";
+				}
+				function classifyLanguage(language) {
+					if (language === "javascript"
+							|| language === "typescript"
+							|| language === "jsx"
+							|| language === "tsx"
+							|| language === "rhai") {
+						return "script";
+					}
+					if (language === "java") {
+						return "java";
+					}
+					if (language === "json") {
+						return "json";
+					}
+					if (language === "sql") {
+						return "sql";
+					}
+					if (language === "bash") {
+						return "bash";
+					}
+					if (language === "css" || language === "scss") {
+						return "css";
+					}
+					if (language === "markdown") {
+						return "markdown";
+					}
+					if (language === "rust") {
+						return "rust";
+					}
+					if (language === "markup" || language === "xml" || language === "html" || language === "vue") {
+						return "markup";
+					}
+					return "plain";
+				}
+				function tokenHtml(type, text) {
+					var escaped = escapeHtml(text);
+					if (!type || !text) {
+						return escaped;
+					}
+					return "<span class='token " + type + "'>" + escaped + "</span>";
+				}
+				function classifyIdentifier(kind, text) {
+					if (!text || !/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(text)) {
+						return kind;
+					}
+					if (kind === "plain") {
+						return "variable";
+					}
+					return kind;
+				}
+				function pushToken(parts, type, text) {
+					if (!text) {
+						return;
+					}
+					parts.push(tokenHtml(type, text));
+				}
+				var wordPattern = /[A-Za-z_$][A-Za-z0-9_$-]*/y;
+				var numberPattern = /(?:0[xX][0-9A-Fa-f_]+|0[bB][01_]+|0[oO][0-7_]+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/y;
+				var operatorPattern = /(?:===|!==|==|!=|<=|>=|->|=>|&&|\|\||::|\+\+|--|\+=|-=|\*=|\/=|%=|&=|\|=|\^=|<<|>>|>>>|\.\.\.|\.\.|[+\-*/%<>=!&|^~?:])/y;
+				function isWhitespaceChar(char) {
+					return char === " " || char === "\t" || char === "\n" || char === "\r" || char === "\f" || char === "\v";
+				}
+				function isUppercaseLetter(char) {
+					return char >= "A" && char <= "Z";
+				}
+				function isPunctuationChar(char) {
+					return char === "("
+						|| char === ")"
+						|| char === "{"
+						|| char === "}"
+						|| char === "["
+						|| char === "]"
+						|| char === ";"
+						|| char === ","
+						|| char === ".";
+				}
+				function matchWordAt(text, index) {
+					wordPattern.lastIndex = index;
+					var match = wordPattern.exec(text);
+					return match ? match[0] : "";
+				}
+				function matchNumberAt(text, index) {
+					numberPattern.lastIndex = index;
+					var match = numberPattern.exec(text);
+					return match ? match[0] : "";
+				}
+				function nextNonSpaceChar(text, index) {
+					for (var i = index; i < text.length; i += 1) {
+						var char = text.charAt(i);
+						if (!isWhitespaceChar(char)) {
+							return char;
+						}
+					}
+					return "";
+				}
+				function createSet(words) {
+					var map = Object.create(null);
+					words.forEach(function (word) {
+							map[word] = true;
+						});
+					return map;
+				}
+				var commonKeywords = createSet(
+					[
+						"if",
+						"else",
+						"for",
+						"while",
+						"switch",
+						"case",
+						"break",
+						"continue",
+						"return",
+						"try",
+						"catch",
+						"finally",
+						"throw",
+						"new",
+						"class",
+						"interface",
+						"enum",
+						"extends",
+						"implements",
+						"import",
+						"package",
+						"public",
+						"private",
+						"protected",
+						"static",
+						"final",
+						"const",
+						"let",
+						"var",
+						"function",
+						"async",
+						"await",
+						"yield",
+						"do",
+						"default",
+						"typeof",
+						"instanceof",
+						"in",
+						"of",
+						"void",
+						"this",
+						"super",
+						"true",
+						"false",
+						"null",
+						"undefined",
+						"fn",
+						"loop",
+						"match",
+						"mod",
+						"pub",
+						"use",
+						"struct",
+						"trait",
+						"impl",
+						"mut",
+					]
+				);
+				var javaKeywords = createSet(
+					[
+						"abstract",
+						"assert",
+						"boolean",
+						"break",
+						"byte",
+						"case",
+						"catch",
+						"char",
+						"class",
+						"const",
+						"continue",
+						"default",
+						"do",
+						"double",
+						"else",
+						"enum",
+						"extends",
+						"final",
+						"finally",
+						"float",
+						"for",
+						"goto",
+						"if",
+						"implements",
+						"import",
+						"instanceof",
+						"int",
+						"interface",
+						"long",
+						"native",
+						"new",
+						"package",
+						"private",
+						"protected",
+						"public",
+						"record",
+						"return",
+						"sealed",
+						"short",
+						"static",
+						"strictfp",
+						"super",
+						"switch",
+						"synchronized",
+						"this",
+						"throw",
+						"throws",
+						"transient",
+						"try",
+						"var",
+						"void",
+						"volatile",
+						"while",
+						"yield",
+						"true",
+						"false",
+						"null",
+					]
+				);
+				var javaTypes = createSet(
+					[
+						"String",
+						"Integer",
+						"Long",
+						"Double",
+						"Float",
+						"Boolean",
+						"Object",
+						"List",
+						"Set",
+						"Map",
+						"Optional",
+						"Stream",
+						"ResponseEntity",
+						"Mono",
+						"Flux",
+					]
+				);
+				var scriptKeywords = createSet(
+					[
+						"break",
+						"case",
+						"catch",
+						"class",
+						"const",
+						"continue",
+						"debugger",
+						"default",
+						"delete",
+						"do",
+						"else",
+						"enum",
+						"export",
+						"extends",
+						"false",
+						"finally",
+						"for",
+						"from",
+						"function",
+						"if",
+						"import",
+						"in",
+						"instanceof",
+						"let",
+						"new",
+						"null",
+						"return",
+						"super",
+						"switch",
+						"this",
+						"throw",
+						"true",
+						"try",
+						"typeof",
+						"undefined",
+						"var",
+						"void",
+						"while",
+						"with",
+						"yield",
+						"async",
+						"await",
+						"implements",
+						"interface",
+						"package",
+						"private",
+						"protected",
+						"public",
+						"readonly",
+						"type",
+						"as",
+						"satisfies",
+						"asserts",
+						"infer",
+						"keyof",
+						"namespace",
+						"declare",
+						"module",
+					]
+				);
+				var rustKeywords = createSet(
+					[
+						"as",
+						"async",
+						"await",
+						"break",
+						"const",
+						"continue",
+						"crate",
+						"dyn",
+						"else",
+						"enum",
+						"extern",
+						"false",
+						"fn",
+						"for",
+						"if",
+						"impl",
+						"in",
+						"let",
+						"loop",
+						"match",
+						"mod",
+						"move",
+						"mut",
+						"pub",
+						"ref",
+						"return",
+						"self",
+						"Self",
+						"static",
+						"struct",
+						"super",
+						"trait",
+						"true",
+						"type",
+						"unsafe",
+						"use",
+						"where",
+						"while",
+					]
+				);
+				var sqlKeywords = createSet(
+					[
+						"select",
+						"from",
+						"where",
+						"join",
+						"left",
+						"right",
+						"inner",
+						"outer",
+						"on",
+						"insert",
+						"into",
+						"update",
+						"delete",
+						"create",
+						"alter",
+						"drop",
+						"table",
+						"view",
+						"index",
+						"and",
+						"or",
+						"not",
+						"null",
+						"is",
+						"in",
+						"exists",
+						"like",
+						"group",
+						"by",
+						"order",
+						"having",
+						"limit",
+						"offset",
+						"distinct",
+						"union",
+						"all",
+						"case",
+						"when",
+						"then",
+						"else",
+						"end",
+						"values",
+						"set",
+						"returning",
+					]
+				);
+				var cssKeywords = createSet(["@media", "@supports", "@keyframes", "from", "to", "important"]);
+				var javaHighlightConfig = {
+					lineComment: "//",
+					blockComment: true,
+					textBlock: true,
+					annotation: true,
+					keywordLookup: javaKeywords,
+					typeLookup: javaTypes,
+					uppercaseTypes: true,
+					detectFunctions: true,
+					functionKeywords: createSet(["void"])
+				};
+				var scriptHighlightConfig = {
+					lineComment: "//",
+					blockComment: true,
+					altLineComment: "#",
+					keywordLookup: scriptKeywords,
+					uppercaseTypes: false,
+					detectFunctions: true,
+					functionKeywords: createSet(["function"]),
+					variableKeywords: createSet(["const", "let", "var"])
+				};
+				var rustHighlightConfig = {
+					lineComment: "//",
+					blockComment: true,
+					keywordLookup: rustKeywords,
+					uppercaseTypes: true,
+					detectFunctions: true,
+					functionKeywords: createSet(["fn"]),
+					variableKeywords: createSet(["let"]),
+					allowVariableMut: true
+				};
+				var sqlHighlightConfig = {
+					lineComment: "--",
+					altLineComment: null,
+					blockComment: true,
+					keywordLookup: sqlKeywords,
+					uppercaseTypes: true,
+					detectFunctions: true
+				};
+				var bashHighlightConfig = {
+					lineComment: "#",
+					blockComment: false,
+					keywordLookup: commonKeywords,
+					uppercaseTypes: false,
+					detectFunctions: true
+				};
+				var cssHighlightConfig = {
+					lineComment: null,
+					altLineComment: null,
+					blockComment: true,
+					keywordLookup: cssKeywords,
+					uppercaseTypes: false
+				};
+				function tokenizeCodeLine(text, state, config) {
+					var parts = [];
+					var index = 0;
+					var quote = state.quote || null;
+					var blockComment = state.blockComment || false;
+					var textBlock = state.textBlock || false;
+					var expectFunction = state.expectFunction || false;
+					var expectVariable = state.expectVariable || false;
+					while (index < text.length) {
+						if (blockComment) {
+							var blockEnd = text.indexOf("*/", index);
+							if (blockEnd === -1) {
+								pushToken(parts, "comment", text.slice(index));
+								index = text.length;
+								break;
+							}
+							pushToken(parts, "comment", text.slice(index, blockEnd + 2));
+							index = blockEnd + 2;
+							blockComment = false;
+							continue;
+						}
+						if (textBlock) {
+							var textBlockEnd = text.indexOf('"""', index);
+							if (textBlockEnd === -1) {
+								pushToken(parts, "string", text.slice(index));
+								index = text.length;
+								break;
+							}
+							pushToken(parts, "string", text.slice(index, textBlockEnd + 3));
+							index = textBlockEnd + 3;
+							textBlock = false;
+							continue;
+						}
+						if (quote) {
+							var escaped = false;
+							var end = index + 1;
+							while (end < text.length) {
+								var char = text.charAt(end);
+								if (escaped) {
+									escaped = false;
+								}
+								else if (char === "\\") {
+									escaped = true;
+								}
+								else if (char === quote) {
+									end += 1;
+									quote = null;
+									break;
+								}
+								end += 1;
+							}
+							pushToken(parts, quote === "'" ? "string" : "string", text.slice(index, end));
+							index = end;
+							continue;
+						}
+						if (config.lineComment && text.slice(index, index + config.lineComment.length) === config.lineComment) {
+							pushToken(parts, "comment", text.slice(index));
+							index = text.length;
+							break;
+						}
+						if (config.altLineComment
+								&& text.slice(index, index + config.altLineComment.length) === config.altLineComment) {
+							pushToken(parts, "comment", text.slice(index));
+							index = text.length;
+							break;
+						}
+						if (config.blockComment && text.slice(index, index + 2) === "/*") {
+							var immediateEnd = text.indexOf("*/", index + 2);
+							if (immediateEnd === -1) {
+								pushToken(parts, "comment", text.slice(index));
+								blockComment = true;
+								index = text.length;
+								break;
+							}
+							pushToken(parts, "comment", text.slice(index, immediateEnd + 2));
+							index = immediateEnd + 2;
+							continue;
+						}
+						if (config.textBlock && text.slice(index, index + 3) === '"""') {
+							var immediateTextEnd = text.indexOf('"""', index + 3);
+							if (immediateTextEnd === -1) {
+								pushToken(parts, "string", text.slice(index));
+								textBlock = true;
+								index = text.length;
+								break;
+							}
+							pushToken(parts, "string", text.slice(index, immediateTextEnd + 3));
+							index = immediateTextEnd + 3;
+							continue;
+						}
+						var current = text.charAt(index);
+						if (current === '"' || current === "'") {
+							quote = current;
+							continue;
+						}
+						if (isWhitespaceChar(current)) {
+							var wsEnd = index + 1;
+							while (wsEnd < text.length && isWhitespaceChar(text.charAt(wsEnd))) {
+								wsEnd += 1;
+							}
+							pushToken(parts, null, text.slice(index, wsEnd));
+							index = wsEnd;
+							continue;
+						}
+						if (config.annotation && current === "@") {
+							var annotation = matchWordAt(text, index + 1);
+							if (annotation) {
+								pushToken(parts, "annotation", "@" + annotation);
+								index += annotation.length + 1;
+								continue;
+							}
+						}
+						var number = matchNumberAt(text, index);
+						if (number) {
+							pushToken(parts, "number", number);
+							index += number.length;
+							continue;
+						}
+						var word = matchWordAt(text, index);
+						if (word) {
+							var tokenType = null;
+							var lookup = config.keywordLookup === sqlKeywords ? word.toLowerCase() : word;
+							var isKeyword = config.keywordLookup && config.keywordLookup[lookup];
+							if (expectFunction) {
+								tokenType = "function";
+								expectFunction = false;
+							}
+							else if (expectVariable) {
+								if (config.allowVariableMut && word === "mut") {
+									tokenType = "keyword";
+								}
+								else {
+									tokenType = "variable";
+									expectVariable = false;
+								}
+							}
+							else if (isKeyword) {
+								tokenType = "keyword";
+							}
+							else if (config.typeLookup && config.typeLookup[word]) {
+								tokenType = "class-name";
+							}
+							else if (config.uppercaseTypes && isUppercaseLetter(word.charAt(0))) {
+								tokenType = "class-name";
+							}
+							else if (config.detectFunctions && nextNonSpaceChar(text, index + word.length) === "(") {
+								tokenType = "function";
+							}
+							pushToken(parts, tokenType, word);
+							if (isKeyword) {
+								if (config.functionKeywords && config.functionKeywords[word]) {
+									expectFunction = true;
+								}
+								if (config.variableKeywords && config.variableKeywords[word]) {
+									expectVariable = true;
+								}
+							}
+							index += word.length;
+							continue;
+						}
+						if (isPunctuationChar(current)) {
+							pushToken(parts, "punctuation", current);
+							index += 1;
+							continue;
+						}
+						operatorPattern.lastIndex = index;
+						var operatorMatch = operatorPattern.exec(text);
+						if (operatorMatch) {
+							pushToken(parts, "operator", operatorMatch[0]);
+							index += operatorMatch[0].length;
+							continue;
+						}
+						pushToken(parts, null, current);
+						index += 1;
+					}
+					return {
+						html: parts.join(""),
+						nextState: {
+							quote: quote,
+							blockComment: blockComment,
+							textBlock: textBlock,
+							expectFunction: expectFunction,
+							expectVariable: expectVariable
+						}
+					};
+				}
+				function highlightMarkdownLine(text, state) {
+					var parts = [];
+					if (/^\s*```/.test(text)) {
+						return { html: tokenHtml("keyword", text), nextState: { fence: !state.fence } };
+					}
+					if (state.fence) {
+						return { html: tokenHtml("code", text), nextState: state };
+					}
+					var match;
+					if (/^\s*#{1,6}\s+/.test(text)) {
+						parts.push(tokenHtml("title", text));
+					}
+					else if (/^\s*[-*+]\s+/.test(text) || /^\s*\d+\.\s+/.test(text)) {
+						parts.push(
+							tokenHtml(
+								"punctuation",
+								text.match(/^\s*([-*+]|)/)
+									? text.slice(0, text.indexOf(text.trim())) + text.trim().split(/\s+/)[0]
+									: text
+							)
+						);
+						parts.push(escapeHtml(text.slice(parts.length ? 0 : 0)));
+						parts = [escapeHtml(text)];
+					}
+					else {
+						var index = 0;
+						while (index < text.length) {
+							if (text.slice(index, index + 2) === "**") {
+								var boldEnd = text.indexOf("**", index + 2);
+								if (boldEnd !== -1) {
+									pushToken(parts, null, text.slice(0, index));
+									pushToken(parts, "bold", text.slice(index, boldEnd + 2));
+									text = text.slice(boldEnd + 2);
+									index = 0;
+									continue;
+								}
+							}
+							index += 1;
+						}
+						parts = [escapeHtml(text)];
+					}
+					match = /(`[^`]+`|\[[^\]]+\]\([^\)]+\))/.exec(text);
+					if (match) {
+						var cursor = 0;
+						var fragments = [];
+						text.replace(
+							/(`[^`]+`|\[[^\]]+\]\([^\)]+\))/g,
+							function (full, token, offset) {
+								fragments.push(escapeHtml(text.slice(cursor, offset)));
+								fragments.push(token.charAt(0) === "`" ? tokenHtml("code", token) : tokenHtml("url", token));
+								cursor = offset + full.length;
+								return full;
+							}
+						);
+						fragments.push(escapeHtml(text.slice(cursor)));
+						return { html: fragments.join(""), nextState: state };
+					}
+					return { html: parts.join("") || escapeHtml(text), nextState: state };
+				}
+				function highlightMarkupTag(tagText) {
+					var parts = [];
+					var index = 0;
+					function pushMarkup(type, value) {
+						if (!value) {
+							return;
+						}
+						parts.push(tokenHtml(type, value));
+					}
+					pushMarkup("punctuation", "<");
+					index = 1;
+					if (tagText.charAt(index) === "/") {
+						pushMarkup("punctuation", "/");
+						index += 1;
+					}
+					while (index < tagText.length - 1 && /\s/.test(tagText.charAt(index))) {
+						pushMarkup(null, tagText.charAt(index));
+						index += 1;
+					}
+					var nameStart = index;
+					while (index < tagText.length - 1 && /[A-Za-z0-9:_-]/.test(tagText.charAt(index))) {
+						index += 1;
+					}
+					pushMarkup("tag", tagText.slice(nameStart, index));
+					while (index < tagText.length - 1) {
+						var ch = tagText.charAt(index);
+						if (/\s/.test(ch)) {
+							var wsStart = index;
+							while (index < tagText.length - 1 && /\s/.test(tagText.charAt(index))) {
+								index += 1;
+							}
+							pushMarkup(null, tagText.slice(wsStart, index));
+							continue;
+						}
+						if (ch === "/") {
+							pushMarkup("punctuation", "/");
+							index += 1;
+							continue;
+						}
+						var attrStart = index;
+						while (index < tagText.length - 1
+								&& /^(?:[A-Za-z_:][-A-Za-z0-9_:.]*)$/.test(tagText.slice(attrStart, index + 1))) {
+							index += 1;
+						}
+						if (index === attrStart) {
+							pushMarkup("punctuation", ch);
+							index += 1;
+							continue;
+						}
+						pushMarkup("attr-name", tagText.slice(attrStart, index));
+						while (index < tagText.length - 1 && /\s/.test(tagText.charAt(index))) {
+							pushMarkup(null, tagText.charAt(index));
+							index += 1;
+						}
+						if (tagText.charAt(index) === "=") {
+							pushMarkup("punctuation", "=");
+							index += 1;
+							while (index < tagText.length - 1 && /\s/.test(tagText.charAt(index))) {
+								pushMarkup(null, tagText.charAt(index));
+								index += 1;
+							}
+							if (tagText.charAt(index) === '"' || tagText.charAt(index) === "'") {
+								var quote = tagText.charAt(index);
+								var valueStart = index;
+								index += 1;
+								while (index < tagText.length - 1 && tagText.charAt(index) !== quote) {
+									index += 1;
+								}
+								if (index < tagText.length - 1) {
+									index += 1;
+								}
+								pushMarkup("attr-value", tagText.slice(valueStart, index));
+							}
+							else {
+								var bareValueStart = index;
+								while (index < tagText.length - 1 && !/[\s>]/.test(tagText.charAt(index))) {
+									index += 1;
+								}
+								pushMarkup("attr-value", tagText.slice(bareValueStart, index));
+							}
+						}
+					}
+					pushMarkup("punctuation", ">");
+					return parts.join("");
+				}
+				function highlightMarkupLine(text, state) {
+					function findMarkupTagEnd(line, start) {
+						var quote = null;
+						for (var i = start + 1; i < line.length; i += 1) {
+							var ch = line.charAt(i);
+							if (quote) {
+								if (ch === quote) {
+									quote = null;
+								}
+								continue;
+							}
+							if (ch === '"' || ch === "'") {
+								quote = ch;
+								continue;
+							}
+							if (ch === ">") {
+								return i;
+							}
+						}
+						return -1;
+					}
+					var parts = [];
+					var index = 0;
+					while (index < text.length) {
+						if (state.inComment) {
+							var commentEnd = text.indexOf("-->", index);
+							if (commentEnd === -1) {
+								pushToken(parts, "comment", text.slice(index));
+								index = text.length;
+								break;
+							}
+							pushToken(parts, "comment", text.slice(index, commentEnd + 3));
+							index = commentEnd + 3;
+							state.inComment = false;
+							continue;
+						}
+						var tagStart = text.indexOf("<", index);
+						if (tagStart === -1) {
+							pushToken(parts, null, text.slice(index));
+							break;
+						}
+						pushToken(parts, null, text.slice(index, tagStart));
+						if (text.slice(tagStart, tagStart + 4) === "<!--") {
+							var commentClose = text.indexOf("-->", tagStart + 4);
+							if (commentClose === -1) {
+								pushToken(parts, "comment", text.slice(tagStart));
+								state.inComment = true;
+								break;
+							}
+							pushToken(parts, "comment", text.slice(tagStart, commentClose + 3));
+							index = commentClose + 3;
+							continue;
+						}
+						var tagEnd = findMarkupTagEnd(text, tagStart);
+						if (tagEnd === -1) {
+							pushToken(parts, "tag", text.slice(tagStart));
+							break;
+						}
+						parts.push(highlightMarkupTag(text.slice(tagStart, tagEnd + 1)));
+						index = tagEnd + 1;
+					}
+					return { html: parts.join(""), nextState: state };
+				}
+				function highlightCssLine(text, state) {
+					return tokenizeCodeLine(text, state, cssHighlightConfig);
+				}
+				function highlightJsonLine(text, state) {
+					var parts = [];
+					var index = 0;
+					while (index < text.length) {
+						var ch = text.charAt(index);
+						if (isWhitespaceChar(ch)) {
+							var wsEnd = index + 1;
+							while (wsEnd < text.length && isWhitespaceChar(text.charAt(wsEnd))) {
+								wsEnd += 1;
+							}
+							pushToken(parts, null, text.slice(index, wsEnd));
+							index = wsEnd;
+							continue;
+						}
+						if (ch === '"') {
+							var end = index + 1;
+							var escaped = false;
+							while (end < text.length) {
+								var current = text.charAt(end);
+								if (escaped) {
+									escaped = false;
+								}
+								else if (current === "\\") {
+									escaped = true;
+								}
+								else if (current === '"') {
+									end += 1;
+									break;
+								}
+								end += 1;
+							}
+							var stringText = text.slice(index, end);
+							var rest = text.slice(end);
+							pushToken(parts, /^\s*:/.test(rest) ? "property" : "string", stringText);
+							index = end;
+							continue;
+						}
+						var number = matchNumberAt(text, index);
+						if (number) {
+							pushToken(parts, "number", number);
+							index += number.length;
+							continue;
+						}
+						var word = matchWordAt(text, index);
+						if (word === "true" || word === "false" || word === "null") {
+							pushToken(parts, "keyword", word);
+							index += word.length;
+							continue;
+						}
+						if (/^[{}\[\],:]$/.test(ch)) {
+							pushToken(parts, "punctuation", ch);
+							index += 1;
+							continue;
+						}
+						pushToken(parts, null, ch);
+						index += 1;
+					}
+					return { html: parts.join(""), nextState: state };
+				}
+				function highlightLineWithState(text, languageType, state) {
+					if (languageType === "java") {
+						return tokenizeCodeLine(text, state, javaHighlightConfig);
+					}
+					if (languageType === "script") {
+						return tokenizeCodeLine(text, state, scriptHighlightConfig);
+					}
+					if (languageType === "rust") {
+						return tokenizeCodeLine(text, state, rustHighlightConfig);
+					}
+					if (languageType === "sql") {
+						return tokenizeCodeLine(text, state, sqlHighlightConfig);
+					}
+					if (languageType === "bash") {
+						return tokenizeCodeLine(text, state, bashHighlightConfig);
+					}
+					if (languageType === "css") {
+						return highlightCssLine(text, state);
+					}
+					if (languageType === "json") {
+						return highlightJsonLine(text, state);
+					}
+					if (languageType === "markdown") {
+						return highlightMarkdownLine(text, state || { fence: false });
+					}
+					if (languageType === "markup") {
+						return highlightMarkupLine(text, state || { inComment: false });
+					}
+					return { html: escapeHtml(text), nextState: state || {} };
+				}
+				function buildHighlightedLines(text, language) {
+					var lines = normalizeLines(text);
+					var languageType = classifyLanguage(language);
+					var state = {};
+					return lines.map(function (line) {
+							var result = highlightLineWithState(line, languageType, state);
+							state = result.nextState || {};
+							return result.html;
+						});
+				}
+				function normalizeLines(text) {
+					if (!text) {
+						return [];
+					}
+					var normalized = String(text).replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+					var lines = normalized.split("\n");
+					if (lines.length > 0 && lines[lines.length - 1] === "") {
+						lines.pop();
+					}
+					return lines;
+				}
+				function buildBlocks(changes) {
+					var blocks = [];
+					var context = [];
+					var pending = [];
+					var group = 0;
+					function pushCollapsedContext(rows, keepLeading, keepTrailing) {
+						var hiddenCount = rows.length - keepLeading - keepTrailing;
+						if (keepLeading > 0) {
+							blocks.push({ type: "context", rows: rows.slice(0, keepLeading) });
+						}
+						if (hiddenCount > 0) {
+							blocks.push({
+								type: "collapsed",
+								group: String(group),
+								collapsedLabel: "+ " + hiddenCount + " unchanged line" + (hiddenCount === 1 ? "" : "s"),
+								expandedLabel: "Hide unchanged lines",
+								rows: rows.slice(keepLeading, rows.length - keepTrailing)
+							});
+							group += 1;
+						}
+						if (keepTrailing > 0) {
+							blocks.push({ type: "context", rows: rows.slice(rows.length - keepTrailing) });
+						}
+					}
+					function flushContext(isTrailing) {
+						if (!context.length) {
+							return;
+						}
+						if (!blocks.length && isTrailing) {
+							blocks.push({ type: "context", rows: context.slice() });
+						}
+						else if (!blocks.length) {
+							if (context.length <= CONTEXT_RADIUS) {
+								blocks.push({ type: "context", rows: context.slice() });
+							}
+							else {
+								pushCollapsedContext(context, 0, CONTEXT_RADIUS);
+							}
+						}
+						else if (isTrailing) {
+							if (context.length <= CONTEXT_RADIUS) {
+								blocks.push({ type: "context", rows: context.slice() });
+							}
+							else {
+								pushCollapsedContext(context, CONTEXT_RADIUS, 0);
+							}
+						}
+						else if (context.length <= CONTEXT_RADIUS * 2) {
+							blocks.push({ type: "context", rows: context.slice() });
+						}
+						else {
+							pushCollapsedContext(context, CONTEXT_RADIUS, CONTEXT_RADIUS);
+						}
+						context = [];
+					}
+					function flushPending() {
+						if (!pending.length) {
+							return;
+						}
+						blocks.push({ type: "change", rows: pending.slice() });
+						pending = [];
+					}
+					for (var index = 0; index < changes.length; index += 1) {
+						if (changes[index].type === "equal") {
+							flushPending();
+							context.push(changes[index]);
+						}
+						else {
+							flushContext(false);
+							pending.push(changes[index]);
+						}
+					}
+					flushPending();
+					flushContext(true);
+					return blocks;
+				}
+				function renderCodeCell(text, language, highlightedHtml) {
+					var source = text == null ? "" : String(text);
+					return "<pre class='code-block language-" + language + "'><code class='language-" + language
+						+ "' data-raw='" + escapeHtml(source) + "'>" + (highlightedHtml || escapeHtml(source))
+						+ "</code></pre>";
+				}
+				function rowClassName(changeType, extraClass) {
+					var baseClass = changeType === "equal" ? "eq" : changeType === "delete" ? "del" : "ins";
+					return extraClass ? baseClass + " " + extraClass : baseClass;
+				}
+				function rowOpenTag(changeType, extraClass, group) {
+					var attributes = "<tr class='" + rowClassName(changeType, extraClass) + "'";
+					if (group != null) {
+						attributes += " data-group='" + group + "'";
+					}
+					return attributes + ">";
+				}
+				function renderUnifiedRow(change, language, lineSets, extraClass, group) {
+					var rowStart = rowOpenTag(change.type, extraClass, group);
+					if (change.type === "delete") {
+						return rowStart + "<td class='ln'>" + change.originalLine + "</td><td class='ln'></td><td class='code'>"
+							+ renderCodeCell(change.text, language, lineSets.original[change.originalLine - 1]) + "</td></tr>";
+					}
+					if (change.type === "insert") {
+						return rowStart + "<td class='ln'></td><td class='ln'>" + change.newLine + "</td><td class='code'>"
+							+ renderCodeCell(change.text, language, lineSets.current[change.newLine - 1]) + "</td></tr>";
+					}
+					return rowStart + "<td class='ln'>" + change.originalLine + "</td><td class='ln'>" + change.newLine
+						+ "</td><td class='code'>"
+						+ renderCodeCell(
+							change.text,
+							language,
+							lineSets.current[change.newLine - 1] || lineSets.original[change.originalLine - 1]
+						)
+						+ "</td></tr>";
+				}
+				function renderSplitRow(change, language, lineSets, extraClass, group) {
+					var rowStart = rowOpenTag(change.type, extraClass, group);
+					if (change.type === "delete") {
+						return rowStart + "<td class='ln'>" + change.originalLine + "</td><td class='code'>"
+							+ renderCodeCell(change.text, language, lineSets.original[change.originalLine - 1])
+							+ "</td><td class='ln'></td><td class='code'></td></tr>";
+					}
+					if (change.type === "insert") {
+						return rowStart + "<td class='ln'></td><td class='code'></td><td class='ln'>" + change.newLine
+							+ "</td><td class='code'>"
+							+ renderCodeCell(change.text, language, lineSets.current[change.newLine - 1]) + "</td></tr>";
+					}
+					return rowStart + "<td class='ln'>" + change.originalLine + "</td><td class='code'>"
+						+ renderCodeCell(change.text, language, lineSets.original[change.originalLine - 1])
+						+ "</td><td class='ln'>" + change.newLine + "</td><td class='code'>"
+						+ renderCodeCell(change.text, language, lineSets.current[change.newLine - 1]) + "</td></tr>";
+				}
+				function renderToggleRow(block, colspan) {
+					return "<tr class='ctx-toggle' data-group='" + block.group + "'><td class='code ctx-cell' colspan='"
+						+ colspan + "'><button class='ctx-btn' data-group='" + block.group + "' data-collapsed='"
+						+ escapeHtml(block.collapsedLabel) + "' data-expanded='" + escapeHtml(block.expandedLabel)
+						+ "' aria-expanded='false'>" + escapeHtml(block.collapsedLabel) + "</button></td></tr>";
+				}
+				function renderWarningRow(message, colspan) {
+					return "<tr class='diff-warning'><td colspan='" + colspan + "'>" + escapeHtml(message) + "</td></tr>";
+				}
+				function renderUnified(blocks, language, lineSets, warningMessage) {
+					var html = [];
+					if (warningMessage) {
+						html.push(renderWarningRow(warningMessage, 3));
+					}
+					blocks.forEach(function (block) {
+							if (block.type === "collapsed") {
+								html.push(renderToggleRow(block, 3));
+								block.rows
+									.forEach(function (row) {
+										html.push(renderUnifiedRow(row, language, lineSets, "ctx-row", block.group));
+									});
+								return;
+							}
+							block.rows.forEach(function (row) {
+									html.push(renderUnifiedRow(row, language, lineSets, "", null));
+								});
+						});
+					return html.join("");
+				}
+				function renderSplit(blocks, language, lineSets, warningMessage) {
+					var html = [];
+					if (warningMessage) {
+						html.push(renderWarningRow(warningMessage, 4));
+					}
+					blocks.forEach(function (block) {
+							if (block.type === "collapsed") {
+								html.push(renderToggleRow(block, 4));
+								block.rows
+									.forEach(function (row) {
+										html.push(renderSplitRow(row, language, lineSets, "ctx-row", block.group));
+									});
+								return;
+							}
+							if (block.type === "change") {
+								for (var index = 0; index < block.rows.length; index += 1) {
+									html.push(renderSplitRow(block.rows[index], language, lineSets, "", null));
+								}
+								return;
+							}
+							block.rows.forEach(function (row) {
+									html.push(renderSplitRow(row, language, lineSets, "", null));
+								});
+						});
+					return html.join("");
+				}
+				function setView(view) {
+					document.body.setAttribute("data-view", view);
+					var table = document.getElementById("diff-table");
+					if (table) {
+						table.classList.toggle("diff-layout-unified", view === "unified");
+						table.classList.toggle("diff-layout-split", view === "split");
+					}
+					document.querySelectorAll("button.toggle")
+						.forEach(function (btn) {
+							btn.classList.toggle("active", btn.getAttribute("data-view") === view);
+						});
+				}
+				function updateContextButton(btn, open) {
+					btn.textContent = open ? btn.getAttribute("data-expanded") : btn.getAttribute("data-collapsed");
+					btn.setAttribute("aria-expanded", open ? "true" : "false");
+				}
+				function bindContextToggles() {
+					var groupedRows = Object.create(null);
+					document.querySelectorAll("tr.ctx-row[data-group]")
+						.forEach(function (row) {
+							var group = row.getAttribute("data-group");
+							if (!groupedRows[group]) {
+								groupedRows[group] = [];
+							}
+							groupedRows[group].push(row);
+						});
+					document.querySelectorAll("button.ctx-btn")
+						.forEach(function (btn) {
+							updateContextButton(btn, false);
+							btn.addEventListener(
+								"click",
+								function () {
+									var group = btn.getAttribute("data-group");
+									var open = btn.getAttribute("aria-expanded") !== "true";
+									(groupedRows[group] || []).forEach(function (row) {
+											row.classList.toggle("ctx-open", open);
+										});
+									updateContextButton(btn, open);
+								}
+							);
+						});
+				}
+				function normalizeStructuredDiff(diff) {
+					if (!Array.isArray(diff)) {
+						return null;
+					}
+					var changes = [];
+					var originalLine = 1;
+					var newLine = 1;
+					for (var index = 0; index < diff.length; index += 1) {
+						var entry = diff[index] || {};
+						var type = entry.type;
+						var text = entry.text;
+						var lines = Array.isArray(text) ? text : normalizeLines(text == null ? "" : String(text));
+						if (type !== "equal" && type !== "delete" && type !== "insert") {
+							return null;
+						}
+						for (var lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+							var lineText = lines[lineIndex];
+							if (type === "equal") {
+								changes.push({
+									type: "equal",
+									originalLine: originalLine,
+									newLine: newLine,
+									text: lineText
+								});
+								originalLine += 1;
+								newLine += 1;
+							}
+							else if (type === "delete") {
+								changes.push({
+									type: "delete",
+									originalLine: originalLine,
+									newLine: null,
+									text: lineText
+								});
+								originalLine += 1;
+							}
+							else {
+								changes.push({
+									type: "insert",
+									originalLine: null,
+									newLine: newLine,
+									text: lineText
+								});
+								newLine += 1;
+							}
+						}
+					}
+					return { changes: changes };
+				}
+				function buildChangesFromUnifiedDiff(originalText, diffText, language) {
+					if (typeof diffText !== "string" || !diffText) {
+						return null;
+					}
+					var originalLines = normalizeLines(originalText);
+					var currentLineHtml = [];
+					var changes = [];
+					var diffLines = normalizeLines(diffText);
+					var languageType = classifyLanguage(language);
+					var state = {};
+					var originalIndex = 0;
+					var newIndex = 0;
+					var seenHunk = false;
+					function pushCurrentLine(text) {
+						var result = highlightLineWithState(text, languageType, state);
+						state = result.nextState || {};
+						currentLineHtml.push(result.html);
+					}
+					for (var index = 0; index < diffLines.length; index += 1) {
+						var line = diffLines[index];
+						if (!seenHunk) {
+							if (line.slice(0, 2) === "@@") {
+								seenHunk = true;
+							}
+							else {
+								continue;
+							}
+						}
+						if (line.slice(0, 2) === "@@") {
+							var match = /^@@(?: -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))?)? @@/.exec(line);
+							if (!match) {
+								return null;
+							}
+							if (match[1] && match[3]) {
+								var targetOriginalIndex = Math.max(parseInt(match[1], 10) - 1, 0);
+								var targetNewIndex = Math.max(parseInt(match[3], 10) - 1, 0);
+								while (originalIndex < targetOriginalIndex && originalIndex < originalLines.length) {
+									var equalText = originalLines[originalIndex];
+									changes.push({
+										type: "equal",
+										originalLine: originalIndex + 1,
+										newLine: newIndex + 1,
+										text: equalText
+									});
+									pushCurrentLine(equalText);
+									originalIndex += 1;
+									newIndex += 1;
+								}
+								newIndex = Math.max(newIndex, targetNewIndex);
+							}
+							continue;
+						}
+						if (!line) {
+							continue;
+						}
+						var marker = line.charAt(0);
+						var text = line.slice(1);
+						if (marker === " ") {
+							changes.push({
+								type: "equal",
+								originalLine: originalIndex + 1,
+								newLine: newIndex + 1,
+								text: text
+							});
+							pushCurrentLine(text);
+							originalIndex += 1;
+							newIndex += 1;
+							continue;
+						}
+						if (marker === "-") {
+							changes.push({
+								type: "delete",
+								originalLine: originalIndex + 1,
+								newLine: null,
+								text: text
+							});
+							originalIndex += 1;
+							continue;
+						}
+						if (marker === "+") {
+							changes.push({
+								type: "insert",
+								originalLine: null,
+								newLine: newIndex + 1,
+								text: text
+							});
+							pushCurrentLine(text);
+							newIndex += 1;
+							continue;
+						}
+						if (line === "\\ No newline at end of file") {
+							continue;
+						}
+						return null;
+					}
+					while (originalIndex < originalLines.length) {
+						var trailingText = originalLines[originalIndex];
+						changes.push({
+							type: "equal",
+							originalLine: originalIndex + 1,
+							newLine: newIndex + 1,
+							text: trailingText
+						});
+						pushCurrentLine(trailingText);
+						originalIndex += 1;
+						newIndex += 1;
+					}
+					return { changes: changes, currentHtml: currentLineHtml };
+				}
+				function buildCollapsedOriginalChanges(originalText, warningMessage) {
+					var originalLines = normalizeLines(originalText);
+					var changes = [];
+					for (var index = 0; index < originalLines.length; index += 1) {
+						changes.push({
+							type: "equal",
+							originalLine: index + 1,
+							newLine: index + 1,
+							text: originalLines[index]
+						});
+					}
+					return { changes: changes, warningMessage: warningMessage || "" };
+				}
+				function renderFromStructuredContent(structuredContent) {
+					structuredContent = structuredContent || {};
+					var path = structuredContent.path || "";
+					var language = prismLanguage(path);
+					var originalText = structuredContent.original || "";
+					var parsed = normalizeStructuredDiff(structuredContent.diff);
+					if (!parsed) {
+						parsed = buildChangesFromUnifiedDiff(originalText, structuredContent.diff, language);
+					}
+					if (!parsed) {
+						parsed = buildCollapsedOriginalChanges(
+							originalText,
+							structuredContent.diff === "" ? "" : "Diff unavailable or invalid. Showing original content only."
+						);
+					}
+					var changes = parsed.changes;
+					var blocks = buildBlocks(changes);
+					var lineSets = { original: buildHighlightedLines(originalText, language), current: parsed.currentHtml || [] };
+					for (var changeIndex = 0; changeIndex < changes.length; changeIndex += 1) {
+						var change = changes[changeIndex];
+						if (change.type === "equal" && change.originalLine != null && change.newLine != null) {
+							lineSets.current[change.newLine - 1] = lineSets.original[change.originalLine - 1];
+						}
+					}
+					document.getElementById("unified-body").innerHTML = renderUnified(blocks, language, lineSets, parsed.warningMessage || "");
+					document.getElementById("split-body").innerHTML = renderSplit(blocks, language, lineSets, parsed.warningMessage || "");
+					bindContextToggles();
+				}
+				setView("unified");
+				document.querySelectorAll("button.toggle")
+					.forEach(function (btn) {
+						btn.addEventListener(
+							"click",
+							function () {
+								setView(btn.getAttribute("data-view"));
+							}
+						);
+					});
+				function setState(state) {
+					document.body.setAttribute("data-state", state);
+				}
+				function setStatusMessage(id, message) {
+					var element = document.getElementById(id);
+					if (element) {
+						element.textContent = message;
+					}
+				}
+				function clearDiffTable() {
+					var unifiedBody = document.getElementById("unified-body");
+					var splitBody = document.getElementById("split-body");
+					if (unifiedBody) {
+						unifiedBody.innerHTML = "";
+					}
+					if (splitBody) {
+						splitBody.innerHTML = "";
+					}
+				}
+				function hasDiff(structuredContent) {
+					return !!(structuredContent
+						&& typeof structuredContent.diff === "string"
+						&& structuredContent.diff.trim() !== "");
+				}
+				function applyResult(result) {
+					if (result && result.isError) {
+						clearDiffTable();
+						setStatusMessage(
+							"error-message",
+							result.structuredContent
+									&& result.structuredContent.message
+								? String(result.structuredContent.message)
+								: "The tool returned an error."
+						);
+						setState("error");
+						return;
+					}
+					if (!hasDiff(result && result.structuredContent)) {
+						clearDiffTable();
+						setStatusMessage(
+							"warning-message",
+							"The tool returned successfully, but there is no diff to display."
+						);
+						setState("warning");
+						return;
+					}
+					setState("ready");
+					renderFromStructuredContent(result && result.structuredContent);
+				}
+				function showLoading() {
+					setState("loading");
+				}
+				try {
+					var app = new window.App({ name: "mcp-fs-diff", version: "1.0.0" });
+					app.ontoolresult = applyResult;
+					if (typeof app.connect === "function") {
+						app.connect().then(showLoading).catch(function (e) {
+								console.error("Failed to connect MCP App", e);
+							});
+					}
+				}
+				catch (e) {
+					console.error("Failed to initialize MCP App", e);
+				}
+			})();
+		</script>
+	</body>
+</html>
